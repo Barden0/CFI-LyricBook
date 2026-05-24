@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CFI LyricBook</title>
+  
+  <!-- Premium Fonts pairing and styling -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,700;0,800;1,600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Dynamic Tailwind via CDN (100% static & standalone portable) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons via CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .font-serif-header {
+      font-family: 'Playfair Display', serif;
+    }
+    .font-mono-tag {
+      font-family: 'Fira Code', monospace;
+    }
+    /* Simple utility classes for custom smooth animations */
+    .fade-in {
+      animation: fadeIn 0.25s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    /* Highlighting search terms beautifully */
+    mark {
+      background-color: rgba(120, 153, 166, 0.25);
+      color: #0c1a20;
+      border-radius: 2px;
+      padding: 0 2px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50/50 text-slate-800 antialiased h-screen flex flex-col overflow-hidden">
+
+  <!-- Success Notifications Toast (Floating slide-in) -->
+  <div id="toast-banner" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-[#7899a6] text-white text-xs font-bold px-6 py-3 rounded-full shadow-lg flex items-center gap-2 tracking-wider uppercase fade-in">
+    <i data-lucide="sparkles" class="w-4 h-4 animate-pulse"></i>
+    <span id="toast-message">Database Updated</span>
+  </div>
+
+  <!-- Primary Application Layout Frame -->
+  <div class="flex-1 flex overflow-hidden min-h-0 relative">
+    
+    <!-- LEFT PANEL: Directory Catalog -->
+    <div id="sidebar-panel" class="w-full md:w-[360px] lg:w-[390px] shrink-0 h-full flex flex-col bg-white border-r border-slate-200 z-10 transition-transform duration-300 md:translate-x-0">
+      
+      <!-- Logo Header and Search -->
+      <div class="p-5 border-b border-slate-200 bg-white shadow-xs">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div class="flex items-center gap-2">
+            <span class="p-2 rounded-xl bg-[#7899a6]/10 text-[#7899a6]">
+              <i data-lucide="music" class="w-5 h-5"></i>
+            </span>
+            <div>
+              <h1 class="font-serif-header text-xl font-bold text-slate-900 leading-none">CFI LyricBook</h1>
+              <p class="text-[10px] text-slate-400 font-semibold tracking-wide uppercase mt-1">Lyric Database</p>
+            </div>
+          </div>
+          <button id="btn-add-song" onclick="openSongForm()" class="inline-flex items-center gap-1.5 bg-[#7899a6] hover:bg-[#5d7e8b] text-white px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all hover:shadow-md active:scale-95 cursor-pointer">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            Add Lyrics
+          </button>
+        </div>
+
+        <!-- Real-time filtering Input -->
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+          <input
+            type="text"
+            id="search-input"
+            oninput="handleSearch(this.value)"
+            placeholder="Search words in lyrics or titles..."
+            class="w-full rounded-xl border border-slate-200 pl-10 pr-4 py-3 text-sm bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#7899a6] focus:ring-2 focus:ring-[#7899a6]/15 focus:bg-white transition-all"
+          />
+        </div>
+
+        <!-- Songs Count tracker and query state indicators -->
+        <div class="flex items-center justify-between text-[11px] text-slate-400 mt-3 font-medium px-0.5">
+          <span id="song-count">0 songs indexed</span>
+          <span id="search-active-status" class="hidden text-[#7899a6]">Filtering active match</span>
+        </div>
+      </div>
+
+      <!-- Scrollable Song List catalog -->
+      <div id="song-list" class="flex-1 overflow-y-auto p-4 space-y-2.5 bg-slate-50/20">
+        <!-- Dynmically loaded song items -->
+      </div>
+
+      <!-- Portable Backup / Restore JSON bar at column footer -->
+      <div class="p-4 bg-white border-t border-slate-200 flex flex-col gap-2">
+        <div class="grid grid-cols-2 gap-2 text-center">
+          <button
+            onclick="exportSongbook()"
+            class="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 border border-slate-200 rounded-xl text-slate-750 hover:text-[#7899a6] hover:bg-slate-50 hover:border-slate-300 text-[11px] font-bold cursor-pointer transition-all active:scale-95"
+            title="Download the updated lyrics directory as songs.json"
+          >
+            <i data-lucide="download" class="w-3.5 h-3.5 text-[#7899a6]"></i>
+            Export songs.json
+          </button>
+
+          <button
+            onclick="triggerImportFileSelection()"
+            class="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 border border-slate-200 rounded-xl text-slate-750 hover:text-[#7899a6] hover:bg-slate-50 hover:border-slate-300 text-[11px] font-bold cursor-pointer transition-all active:scale-95"
+            title="Temporarily load an alternative songs.json file"
+          >
+            <i data-lucide="upload" class="w-3.5 h-3.5 text-[#7899a6]"></i>
+            Import songs.json
+          </button>
+        </div>
+        
+        <input
+          type="file"
+          id="import-file-input"
+          onchange="importSongbook(event)"
+          accept=".json"
+          class="hidden"
+        />
+        
+        <div class="text-[10px] text-slate-400 text-center flex items-center justify-center gap-1 mt-0.5 font-medium">
+          <i data-lucide="info" class="w-3 h-3 text-[#7899a6]"></i>
+          <span>Song list changes are saved instantly in your browser!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: Primary Media Reader / Presentation Canvas -->
+    <div class="flex-1 h-full min-w-0 flex flex-col bg-slate-50/50">
+      
+      <!-- Back button for responsive layouts -->
+      <div class="md:hidden p-4 bg-white border-b border-slate-200 flex items-center">
+        <button onclick="toggleMobileSidebar(true)" class="inline-flex items-center gap-1.5 text-xs text-slate-600 font-extrabold hover:text-[#7899a6] cursor-pointer">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          Back to Directory index
+        </button>
+      </div>
+
+      <div class="flex-1 p-4 md:p-6 lg:p-8 flex flex-col min-h-0">
+        
+        <!-- DISPLAY CARD: Active song viewer container -->
+        <div id="song-reader-card" class="hidden w-full h-full bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col fade-in">
+          
+          <!-- Header and controls: Edit / Delete -->
+          <div class="bg-slate-50/80 px-6 py-5 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 id="active-song-title" class="font-serif-header text-3xl font-extrabold text-slate-950 tracking-tight leading-tight">Amazing Grace</h2>
+              <p id="active-song-artist" class="text-sm font-semibold text-slate-500 mt-1">by John Newton</p>
+            </div>
+
+            <!-- Action controls -->
+            <div class="flex items-center gap-2 select-none">
+              <button
+                onclick="editCurrentSong()"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 hover:text-[#7899a6] hover:border-slate-300 transition-colors cursor-pointer active:scale-95"
+              >
+                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                Edit Lyrics
+              </button>
+
+              <!-- Confirmable Delete Button flow -->
+              <div id="delete-trigger-container" class="relative">
+                <button
+                  id="btn-delete-init"
+                  onclick="toggleDeleteConfirmation(true)"
+                  class="inline-flex items-center justify-center p-2 rounded-xl border border-red-100 text-red-650 bg-red-50 hover:bg-red-100/80 transition-colors cursor-pointer active:scale-95"
+                  title="Delete this song permanently"
+                >
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+                
+                <div id="delete-confirm-box" class="hidden absolute right-0 top-0 z-20 flex items-center gap-1.5 bg-red-50 p-1.5 rounded-xl border border-red-200 shadow-md whitespace-nowrap fade-in">
+                  <span class="text-[10px] font-bold text-red-700 px-1">Erase song?</span>
+                  <button onclick="commitDelete()" class="px-2.5 py-1 rounded-lg bg-red-650 hover:bg-red-700 text-[10px] font-bold text-white cursor-pointer select-none">Yes</button>
+                  <button onclick="toggleDeleteConfirmation(false)" class="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-[10px] font-bold text-slate-650 hover:bg-slate-50 cursor-pointer select-none">No</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Plain lyrics copy board panel (optimized for EasyWorship, ProPresenter) -->
+          <div class="px-6 py-4 bg-white border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-3xs">
+            <span class="text-xs text-slate-400 font-medium text-center sm:text-left">
+              <i data-lucide="info" class="w-3.5 h-3.5 inline mr-1 text-slate-400"></i>
+              Copies plain lyrics directly
+            </span>
+            <button
+              id="btn-copy-lyrics"
+              onclick="copyActiveLyrics()"
+              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-[#7899a6] hover:bg-[#5d7e8b] text-white transition-all cursor-pointer shadow-xs active:scale-95"
+            >
+              <i data-lucide="copy" class="w-4 h-4"></i>
+              <span>Copy Lyrics</span>
+            </button>
+          </div>
+
+          <!-- Clean high-contrast typography body lyrics reader -->
+          <div class="flex-1 overflow-y-auto p-6 md:p-12 bg-white min-h-0 select-text">
+            <article id="active-song-lyrics-canvas" class="max-w-xl mx-auto text-slate-705 font-sans font-normal text-base md:text-lg space-y-2 whitespace-pre-wrap leading-relaxed select-text">
+              <!-- Lyrics loaded here -->
+            </article>
+          </div>
+        </div>
+
+        <!-- HERO DISPLAY CARD: State when nothing is selected -->
+        <div id="empty-state-card" class="w-full h-full rounded-2xl border-2 border-slate-200 border-dashed bg-white/50 flex flex-col items-center justify-center p-8 text-center fade-in">
+          <div class="p-4.5 rounded-full bg-[#7899a6]/10 border border-[#7899a6]/25 text-[#7899a6] mb-4">
+            <i data-lucide="book-open" class="w-8 h-8"></i>
+          </div>
+          <h2 class="font-serif-header text-2xl font-bold text-slate-900">CFI LyricBook Presenter</h2>
+          <p class="text-xs text-slate-400 mt-2 max-w-sm leading-relaxed font-semibold">
+            Select a song from the directory or import files to review, search, and click to copy plain text lyrics instantly to your projection environment (ProPresenter, EasyWorship).
+          </p>
+          
+          <!-- Friendly database updates card -->
+          <div class="mt-8 p-5 max-w-sm rounded-2xl bg-slate-50 border border-slate-200 text-left text-xs text-slate-600 leading-relaxed shadow-3xs">
+            <div class="font-bold text-[#7899a6] text-sm mb-2 flex items-center gap-1.5">
+              <i data-lucide="database" class="w-4 h-4 text-[#7899a6]"></i>
+              How is the database updated?
+            </div>
+            Edits are saved instantly in your browser. Just like updating a blog, you can make your changes permanent for everyone on your team by exporting <strong><code>songs.json</code></strong> and replacing it in your website's main folder.
+          </div>
+
+          <button onclick="openSongForm()" class="mt-6 inline-flex items-center gap-2 bg-[#7899a6] hover:bg-[#5d7e8b] text-white px-5 py-3 rounded-xl text-xs font-bold shadow-md cursor-pointer active:scale-95 transition-all">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            Create New Lyrics Page
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT MODAL FORM: Add / Edit lyrics details -->
+  <div id="form-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs select-none p-4 transition-all fade-in">
+    <div class="bg-white rounded-2xl border border-slate-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] shadow-xl animate-fade-in relative z-50">
+      
+      <!-- Modal Title -->
+      <div class="flex items-center justify-between px-6 py-4.5 border-b border-slate-150 bg-slate-50/70">
+        <div>
+          <h3 id="form-modal-title" class="font-serif-header text-xl font-bold text-slate-900 tracking-tight">Add New Song Document</h3>
+          <p class="text-[11px] text-slate-500 mt-1">Type details manually or drag-and-drop a text file below to import automatically.</p>
+        </div>
+        <button onclick="closeSongForm()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-full hover:bg-slate-100 transition-colors cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Scrollable Form Body -->
+      <div class="flex-1 overflow-y-auto px-6 py-5 space-y-5 select-text">
+        <div id="form-validation-error" class="hidden p-3 rounded-xl bg-red-50 border border-red-100 text-xs font-semibold text-red-650">
+          Please fill out the required title and lyrics content.
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Song Title <span class="text-red-500">*</span></label>
+            <input
+              type="text"
+              id="form-input-title"
+              placeholder="e.g. Amazing Grace"
+              class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#7899a6] focus:ring-2 focus:ring-[#7899a6]/10"
+            />
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Artist / Composer</label>
+            <input
+              type="text"
+              id="form-input-artist"
+              placeholder="e.g. John Newton"
+              class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#7899a6] focus:ring-2 focus:ring-[#7899a6]/10"
+            />
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold uppercase tracking-wider text-slate-500">Song Lyrics & Slides text <span class="text-red-500">*</span></label>
+          <textarea
+            id="form-input-lyrics"
+            placeholder="Introduce headers for sections (e.g. [Verse 1], [Chorus]) and paste lyrics..."
+            rows="10"
+            class="w-full rounded-xl border border-slate-200 p-4 font-sans text-sm leading-relaxed text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#7899a6] focus:ring-2 focus:ring-[#7899a6]/10 bg-slate-50/25"
+          ></textarea>
+        </div>
+
+        <!-- Drag and drop region -->
+        <div
+          id="dropzone"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+          ondrop="handleDropOverride(event)"
+          class="border-2 border-dashed rounded-xl p-5 flex flex-col items-center justify-center gap-2 transition-all border-slate-200 bg-slate-50/50 hover:bg-slate-50"
+        >
+          <input
+            type="file"
+            id="raw-text-file-input"
+            onchange="handleRawTextInputChange(event)"
+            accept=".txt,.md"
+            class="hidden"
+          />
+          <i data-lucide="upload-cloud" class="w-6 h-6 text-slate-400"></i>
+          <span class="text-xs text-center text-slate-600">
+            Drag here or <button onclick="triggerRawFileSelection()" class="font-bold text-[#7899a6] hover:underline cursor-pointer">browse file</button> to insert plain text file (.txt, .md).
+          </span>
+          <p id="dropzone-error" class="hidden text-[10px] text-red-650 font-bold font-sans"></p>
+        </div>
+      </div>
+
+      <!-- Controls sticky bottom -->
+      <div class="px-6 py-4.5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+        <button
+          onclick="closeSongForm()"
+          class="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 cursor-pointer active:scale-95 transition-all"
+        >
+          Cancel
+        </button>
+        <button
+          onclick="commitSaveSong()"
+          class="px-5 py-2.5 rounded-xl text-xs font-bold bg-[#7899a6] hover:bg-[#5d7e8b] text-white cursor-pointer active:scale-95 transition-all"
+        >
+          Save Details
+        </button>
+      </div>
+
+    </div>
+  </div>  <!-- CENTRAL CODE CORE: Static database + Storage Ledger logic -->
+  <script>
+    // Current app state memory
+    let songs = [];
+    let selectedSongId = null;
+    let searchQuery = "";
+    let isEditingMode = false;
+    let targetEditingSongId = null;
+
+    // Load initial context
+    window.addEventListener("DOMContentLoaded", () => {
+      loadLedger();
+      lucide.createIcons();
+    });
+
+    // Storage and static baseline JSON database loads
+    async function loadLedger() {
+      let loadedSongs = [];
+      let foundInCache = false;
+
+      // 1. Try loading from browser localStorage cache
+      try {
+        const stored = localStorage.getItem("cfi_songs_ledger");
+        if (stored) {
+          loadedSongs = JSON.parse(stored);
+          foundInCache = true;
+        }
+      } catch (e) {
+        console.error("Could not parse browser cache memory ledger:", e);
+      }
+
+      // 2. Fallback to static asset fetch of baseline songs.json if cache is empty
+      if (!foundInCache || !loadedSongs || loadedSongs.length === 0) {
+        try {
+          const res = await fetch("./songs.json");
+          if (res.ok) {
+            loadedSongs = await res.json();
+            // Store baseline in cache so edits are saved instantly
+            localStorage.setItem("cfi_songs_ledger", JSON.stringify(loadedSongs));
+          }
+        } catch (err) {
+          console.warn("Static database baseline file loading failed:", err);
+        }
+      }
+
+      songs = loadedSongs || [];
+
+      // Select first song by default if songs exist
+      if (songs.length > 0 && !selectedSongId) {
+        selectedSongId = songs[0].id;
+      }
+      
+      renderList();
+      renderContentDetail();
+    }
+
+    // Keep state synchronous with browser localStorage cache
+    function saveToLocalStorage() {
+      localStorage.setItem("cfi_songs_ledger", JSON.stringify(songs));
+    }
+
+    // List rendering engine
+    function renderList() {
+      const listContainer = document.getElementById("song-list");
+      const countLabel = document.getElementById("song-count");
+      const searchStatus = document.getElementById("search-active-status");
+      
+      listContainer.innerHTML = "";
+      
+      const q = searchQuery.toLowerCase().trim();
+      const filtered = songs.filter(song => {
+        if (!q) return true;
+        return song.title.toLowerCase().includes(q) || 
+               (song.artist && song.artist.toLowerCase().includes(q)) || 
+               song.lyrics.toLowerCase().includes(q);
+      });
+
+      countLabel.textContent = `${filtered.length} song${filtered.length === 1 ? '' : 's'} indexed`;
+      if (q) {
+        searchStatus.classList.remove("hidden");
+      } else {
+        searchStatus.classList.add("hidden");
+      }
+
+      if (filtered.length === 0) {
+        listContainer.innerHTML = `
+          <div class="text-center py-10 px-4 bg-white rounded-xl border border-slate-200 border-dashed fade-in">
+            <p class="text-xs font-bold text-slate-400">No matching songs found.</p>
+            <p class="text-[10px] text-slate-400 mt-1">Try another search or click 'Add Lyrics' above.</p>
+          </div>
+        `;
+        return;
+      }
+
+      filtered.forEach(song => {
+        const isSelected = song.id === selectedSongId;
+        
+        // Find first few lines for preview
+        const lines = song.lyrics.split("\n").filter(l => l.trim() && !l.startsWith("["));
+        const firstLine = lines[0] || "";
+        const secondLine = lines[1] || "";
+        const previewText = firstLine + (secondLine ? " • " + secondLine : "");
+
+        const card = document.createElement("div");
+        card.id = `song-card-${song.id}`;
+        card.onclick = () => selectSong(song.id);
+        card.className = `group flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer ${
+          isSelected 
+            ? "bg-[#7899a6]/5 border-[#7899a6]/50 shadow-xs" 
+            : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-2xs"
+        }`;
+        
+        card.innerHTML = `
+          <div class="flex-1 min-w-0 pr-2">
+            <h4 class="font-serif-header text-base font-bold text-slate-900 group-hover:text-[#7899a6] truncate transition-colors ${
+              isSelected ? "text-[#7899a6]" : ""
+            }">
+              ${escapeHtml(song.title)}
+            </h4>
+            <p class="text-xs font-semibold text-slate-400 mb-2 truncate">by ${escapeHtml(song.artist || 'Unknown Composer')}</p>
+            <p class="text-[11px] text-slate-500 italic truncate font-sans">${escapeHtml(previewText || 'No lyrics entered')}</p>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-slate-300 group-hover:text-[#7899a6] shrink-0 transition-colors ${
+            isSelected ? "text-[#7899a6]" : ""
+          }"></i>
+        `;
+
+        listContainer.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    // Handle selecting a song from index
+    function selectSong(id) {
+      selectedSongId = id;
+      renderList();
+      renderContentDetail();
+      
+      // On mobile view, show reader screen
+      toggleMobileSidebar(false);
+    }
+
+    // Detail lyrics reader loader
+    function renderContentDetail() {
+      const songCard = document.getElementById("song-reader-card");
+      const emptyCard = document.getElementById("empty-state-card");
+      
+      if (!selectedSongId) {
+        songCard.classList.add("hidden");
+        emptyCard.classList.remove("hidden");
+        return;
+      }
+
+      const song = songs.find(s => s.id === selectedSongId);
+      if (!song) {
+        selectedSongId = null;
+        renderContentDetail();
+        return;
+      }
+
+      songCard.classList.remove("hidden");
+      emptyCard.classList.add("hidden");
+
+      document.getElementById("active-song-title").textContent = song.title;
+      document.getElementById("active-song-artist").textContent = "by " + (song.artist || "Unknown Writer");
+      
+      // Reset confirmations
+      toggleDeleteConfirmation(false);
+
+      // Render lyrics with highlight matching
+      const canvas = document.getElementById("active-song-lyrics-canvas");
+      canvas.innerHTML = "";
+      
+      const q = searchQuery.toLowerCase().trim();
+      const rawLines = song.lyrics.split("\n");
+
+      rawLines.forEach((line) => {
+        // Render blank spaces as section spacing
+        if (!line.trim()) {
+          const gap = document.createElement("div");
+          gap.className = "h-5";
+          canvas.appendChild(gap);
+          return;
+        }
+
+        // Bracket section headers style (e.g. [Verse 1])
+        const p = document.createElement("p");
+        if (line.startsWith("[") && line.endsWith("]")) {
+          p.className = "text-xs font-mono-tag font-bold uppercase tracking-wider text-[#6a8793] mt-4 mb-1 border-b border-slate-100 pb-1";
+          p.textContent = line;
+          canvas.appendChild(p);
+          return;
+        }
+
+        p.className = "hover:text-[#7899a6] text-slate-700 font-normal transition-colors leading-relaxed";
+        
+        // Highlight terms if search contains characters
+        if (q && line.toLowerCase().includes(q)) {
+          const escapedQ = escapeRegExp(q);
+          const regex = new RegExp(`(${escapedQ})`, "gi");
+          const parts = line.split(regex);
+          
+          p.innerHTML = parts.map(part => {
+            if (part.toLowerCase() === q) {
+              return `<mark class="bg-[#7899a6]/25 text-slate-950 font-normal px-0.5 rounded shadow-3xs">${escapeHtml(part)}</mark>`;
+            }
+            return escapeHtml(part);
+          }).join("");
+        } else {
+          p.textContent = line;
+        }
+
+        canvas.appendChild(p);
+      });
+
+      // Update Lucide SVG icons in the detail header
+      lucide.createIcons();
+    }
+
+    // Copy lyrics method: sanitizes content, triggers flash state
+    function copyActiveLyrics() {
+      const song = songs.find(s => s.id === selectedSongId);
+      if (!song) return;
+
+      // Filter out section brackets for a perfectly clean output format
+      const purifiedLyrics = song.lyrics
+        .split("\n")
+        .filter(line => !line.trim().startsWith("["))
+        .join("\n")
+        .trim();
+
+      navigator.clipboard.writeText(purifiedLyrics).then(() => {
+        showToast(`Copied "${song.title}" plain text lyrics!`);
+        
+        // Success visual checkmarks on copy button
+        const btn = document.getElementById("btn-copy-lyrics");
+        const origContent = btn.innerHTML;
+        
+        btn.innerHTML = `<i data-lucide="check" class="w-4 h-4 text-emerald-400 animate-pulse"></i> <span class="text-emerald-400">Lyrics Copied!</span>`;
+        btn.classList.remove("bg-[#7899a6]", "hover:bg-[#5d7e8b]");
+        btn.classList.add("bg-emerald-950", "border-emerald-700/50");
+        lucide.createIcons();
+
+        setTimeout(() => {
+          btn.innerHTML = origContent;
+          btn.classList.add("bg-[#7899a6]", "hover:bg-[#5d7e8b]");
+          btn.classList.remove("bg-emerald-950", "border-emerald-700/50");
+          lucide.createIcons();
+        }, 2200);
+      }).catch(err => {
+        showToast("Clipboard write permission blocked.");
+      });
+    }
+
+    // Active instant search input handler
+    function handleSearch(val) {
+      searchQuery = val;
+      renderList();
+      renderContentDetail();
+    }
+
+    // Modal Form actions
+    function openSongForm() {
+      isEditingMode = false;
+      targetEditingSongId = null;
+      document.getElementById("form-modal-title").textContent = "Add New Lyrics Document";
+      
+      // Clear values
+      document.getElementById("form-input-title").value = "";
+      document.getElementById("form-input-artist").value = "";
+      document.getElementById("form-input-lyrics").value = "";
+      document.getElementById("form-validation-error").classList.add("hidden");
+
+      const modal = document.getElementById("form-modal");
+      modal.classList.remove("hidden");
+      document.getElementById("form-input-title").focus();
+    }
+
+    function editCurrentSong() {
+      const song = songs.find(s => s.id === selectedSongId);
+      if (!song) return;
+
+      isEditingMode = true;
+      targetEditingSongId = song.id;
+      document.getElementById("form-modal-title").textContent = "Edit Lyrics Document";
+
+      document.getElementById("form-input-title").value = song.title;
+      document.getElementById("form-input-artist").value = song.artist || "";
+      document.getElementById("form-input-lyrics").value = song.lyrics;
+      document.getElementById("form-validation-error").classList.add("hidden");
+
+      document.getElementById("form-modal").classList.remove("hidden");
+    }
+
+    function closeSongForm() {
+      document.getElementById("form-modal").classList.add("hidden");
+    }
+
+    // Process song metadata and persist
+    function commitSaveSong() {
+      const title = document.getElementById("form-input-title").value.trim();
+      const artist = document.getElementById("form-input-artist").value.trim();
+      const lyrics = document.getElementById("form-input-lyrics").value.trim();
+      const errBanner = document.getElementById("form-validation-error");
+
+      if (!title || !lyrics) {
+        errBanner.classList.remove("hidden");
+        return;
+      }
+      errBanner.classList.add("hidden");
+
+      if (isEditingMode && targetEditingSongId) {
+        const index = songs.findIndex(s => s.id === targetEditingSongId);
+        if (index !== -1) {
+          songs[index] = {
+            ...songs[index],
+            title: title,
+            artist: artist || "Unknown Composer",
+            lyrics: lyrics,
+            updatedAt: new Date().toISOString()
+          };
+          showToast(`Saved changes for "${title}"`);
+        }
+      } else {
+        const id = title.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now();
+        const fresh = {
+          id: id,
+          title: title,
+          artist: artist || "Unknown Composer",
+          lyrics: lyrics,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        songs.unshift(fresh);
+        selectedSongId = id; // Auto focus newly added song
+        showToast(`"${title}" added to index`);
+      }
+
+      saveToLocalStorage();
+      renderList();
+      renderContentDetail();
+      closeSongForm();
+    }
+
+    // Safe Delete flow
+    function toggleDeleteConfirmation(show) {
+      const box = document.getElementById("delete-confirm-box");
+      if (show) {
+        box.classList.remove("hidden");
+      } else {
+        box.classList.add("hidden");
+      }
+    }
+
+    function commitDelete() {
+      if (!selectedSongId) return;
+      const song = songs.find(s => s.id === selectedSongId);
+      const title = song ? song.title : "";
+
+      songs = songs.filter(s => s.id !== selectedSongId);
+      saveToLocalStorage();
+      
+      selectedSongId = songs.length > 0 ? songs[0].id : null;
+      
+      toggleDeleteConfirmation(false);
+      renderList();
+      renderContentDetail();
+      showToast(`Deleted song page: "${title}"`);
+    }
+
+    // Backup current storage ledger as downloadable .json
+    function exportSongbook() {
+      try {
+        const dataStr = JSON.stringify(songs, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "songs.json";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showToast("songs.json downloaded! Replace songs.json in your website's folder to save.");
+      } catch (err) {
+        showToast("Error generating backup download.");
+      }
+    }
+
+    // Restore Database from JSON
+    function triggerImportFileSelection() {
+      document.getElementById("import-file-input").click();
+    }
+
+    function importSongbook(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (Array.isArray(parsed) && parsed.every(item => item.title && item.lyrics)) {
+            const formatted = parsed.map((item, idx) => ({
+              id: item.id || `imported-${Date.now()}-${idx}`,
+              title: item.title,
+              artist: item.artist || "Unknown Composer",
+              lyrics: item.lyrics,
+              createdAt: item.createdAt || new Date().toISOString(),
+              updatedAt: item.updatedAt || new Date().toISOString()
+            }));
+
+            songs = formatted;
+            saveToLocalStorage();
+            selectedSongId = songs.length > 0 ? songs[0].id : null;
+            
+            renderList();
+            renderContentDetail();
+            showToast("Database successfully restored!");
+          } else {
+            alert("This backup file is invalid. Ensure it follows the required CFI LyricBook JSON schema.");
+          }
+        } catch (error) {
+          alert("Error parsing backup JSON file. Make sure it is formatted correctly.");
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = ""; // Clear input selection
+    }
+
+    // drag zone text handler for files inside save modal
+    function triggerRawFileSelection() {
+      document.getElementById("raw-text-file-input").click();
+    }
+
+    function handleRawTextInputChange(event) {
+      const file = event.target.files?.[0];
+      if (file) processRawLyricsTextFile(file);
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      const dz = document.getElementById("dropzone");
+      dz.classList.add("border-[#7899a6]", "bg-[#7899a6]/5", "text-[#7899a6]");
+    }
+
+    function handleDragLeave(e) {
+      e.preventDefault();
+      const dz = document.getElementById("dropzone");
+      dz.classList.remove("border-[#7899a6]", "bg-[#7899a6]/5", "text-[#7899a6]");
+    }
+
+    function handleDropOverride(e) {
+      e.preventDefault();
+      handleDragLeave(e);
+      const file = e.dataTransfer?.files?.[0];
+      if (file) processRawLyricsTextFile(file);
+    }
+
+    function processRawLyricsTextFile(file) {
+      const errLabel = document.getElementById("dropzone-error");
+      errLabel.classList.add("hidden");
+
+      if (!file.name.endsWith(".txt") && !file.name.endsWith(".md")) {
+        errLabel.textContent = "Only plain text files (.txt, .md) are supported.";
+        errLabel.classList.remove("hidden");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result;
+        document.getElementById("form-input-lyrics").value = text;
+        
+        // Auto-assign title based on filename if title is empty
+        const titleField = document.getElementById("form-input-title");
+        if (!titleField.value.trim()) {
+          const rawName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+          titleField.value = rawName.replace(/[-_]/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+        }
+        showToast("Lyrics imported from file!");
+      };
+      reader.onerror = () => {
+        errLabel.textContent = "Error reading specified text document.";
+        errLabel.classList.remove("hidden");
+      };
+      reader.readAsText(file);
+    }
+
+    // Mobile specific layout helpers
+    function toggleMobileSidebar(show) {
+      const sidebar = document.getElementById("sidebar-panel");
+      if (show) {
+        sidebar.classList.remove("-translate-x-full");
+        sidebar.classList.add("translate-x-0");
+      } else {
+        sidebar.classList.remove("translate-x-0");
+        sidebar.classList.add("-translate-x-full");
+      }
+    }
+
+    // Floating alerts toasts
+    function showToast(msg) {
+      const toast = document.getElementById("toast-banner");
+      document.getElementById("toast-message").textContent = msg;
+      
+      toast.classList.remove("hidden");
+      setTimeout(() => {
+        toast.classList.add("hidden");
+      }, 3000);
+    }
+
+    // Helper: secure string characters rendering
+    function escapeHtml(string) {
+      return String(string)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // Helper: normalize searches matching safely
+    function escapeRegExp(str) {
+      return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+  </script>
+</body>
+</html>
